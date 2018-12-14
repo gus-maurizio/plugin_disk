@@ -1,11 +1,11 @@
 package main
 
 import (
-		"encoding/json"
-		"errors"
-		"fmt"
-		"github.com/shirou/gopsutil/disk"
-		log "github.com/sirupsen/logrus"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/shirou/gopsutil/disk"
+	log "github.com/sirupsen/logrus"
     	"time"
 )
 
@@ -19,7 +19,7 @@ func PluginMeasure() ([]byte, []byte, float64) {
 	for k := range PluginData {delete(PluginData, k)}
 	d, _  := disk.Partitions(false)
 	for _, part := range d {
-		PluginData[part.Mountpoint], _ := disk.Usage(part.Mountpoint)
+		PluginData[part.Mountpoint], _ = disk.Usage(part.Mountpoint)
 	}
 	// Make it understandable
 	// Apply USE methodology for DISK
@@ -28,30 +28,9 @@ func PluginMeasure() ([]byte, []byte, float64) {
 	//		Latency is the MHz of each CPU weighted by usage
 	// S:	Saturation (how full is the filesystem)
 	// E:	Errors (not applicable for DISK)
-	cpuavg := 0.0
-	cpumax := 0.0
-	cpumin := 100.0
-	cpulat := 0.0
-	for cpuid, cpup := range(PluginData["cpupercent"].([]float64)) {
-		if cpup > cpumax {cpumax = cpup}
-		if cpup < cpumin {cpumin = cpup}
-		cpuavg += cpup
-		fmt.Printf("cpuid %v cpup %v\n",cpuid,cpup)
-		cpulat += cpup * PluginEnv[0].Mhz / 100.0
-	}
 	// Prepare the data
-	PluginData["cpu"]    		= cpuavg / float64(len(PluginData["cpupercent"].([]float64)))
-	PluginData["cpumax"] 		= cpumax
-	PluginData["cpumin"] 		= cpumin
-	PluginData["use"]    		= PluginData["cpu"]
-	PluginData["latency"]  		= 1e3 / PluginEnv[0].Mhz
-	PluginData["throughput"]  	= cpulat
-	PluginData["throughputmax"] = PluginEnv[0].Mhz * float64(len(PluginData["cpupercent"].([]float64)))
-	PluginData["use"]    		= PluginData["cpu"]
-	PluginData["saturation"]    = 100.0 * cpumax / PluginConfig["alert"]["anycpu"]["design"].(float64)
-	PluginData["errors"]    	= 0.00
 
-	myMeasure, _				:= json.Marshal(PluginData["cpupercent"])
+	myMeasure, _				:= json.Marshal(PluginData)
 	myMeasureRaw, _ 			:= json.Marshal(PluginData)
 	return myMeasure, myMeasureRaw, float64(time.Now().UnixNano())/1e9
 }
@@ -66,48 +45,6 @@ func PluginAlert(measure []byte) (string, string, bool, error) {
 	alertFlag := false
 	alertErr  := errors.New("nothing")
 
-	// Check that the CPU overall value is within range
-	switch {
-		case PluginData["cpu"].(float64) < PluginConfig["alert"]["cpu"]["low"].(float64):
-			alertLvl  = "warn"
-			alertMsg  += "Overall CPU below low design point "
-			alertFlag = true
-			alertErr  = errors.New("low cpu")
-		case PluginData["cpu"].(float64) > PluginConfig["alert"]["cpu"]["engineered"].(float64):
-			alertLvl  = "fatal"
-			alertMsg  += "Overall CPU above engineered point "
-			alertFlag = true
-			alertErr  = errors.New("excessive cpu")
-			// return now, looks bad
-			return alertMsg, alertLvl, alertFlag, alertErr
-		case PluginData["cpu"].(float64) > PluginConfig["alert"]["cpu"]["design"].(float64):
-			alertLvl  = "warn"
-			alertMsg  += "Overall CPU above design point "
-			alertFlag = true
-			alertErr  = errors.New("moderately high cpu")
-	}
-	// Check each CPU for potential issues with usage
-	for cpuid, eachcpu := range(PluginData["cpupercent"].([]float64)) {
-		switch {
-			case eachcpu < PluginConfig["alert"]["anycpu"]["low"].(float64):
-				alertLvl  = "warn"
-				alertMsg  += fmt.Sprintf("CPU %d below low design point: %f ",cpuid,eachcpu)
-				alertFlag = true
-				alertErr  = errors.New("low cpu")
-			case eachcpu > PluginConfig["alert"]["anycpu"]["engineered"].(float64):
-				alertLvl  = "fatal"
-				alertMsg  += fmt.Sprintf("CPU %d above engineered point: %f ",cpuid,eachcpu)
-				alertFlag = true
-				alertErr  = errors.New("excessive cpu")
-				// return now, looks bad
-				return alertMsg, alertLvl, alertFlag, alertErr
-			case eachcpu > PluginConfig["alert"]["anycpu"]["design"].(float64):
-				alertLvl  = "warn"
-				alertMsg  += fmt.Sprintf("CPU %d above design point: %f ",cpuid,eachcpu)
-				alertFlag = true
-				alertErr  = errors.New("moderately high cpu")
-		}	
-	}
 	return alertMsg, alertLvl, alertFlag, alertErr
 }
 
