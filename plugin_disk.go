@@ -43,7 +43,7 @@ func PluginAlert(measure []byte) (string, string, bool, error) {
 	alertMsg  := ""
 	alertLvl  := ""
 	alertFlag := false
-	alertErr  := errors.New("nothing")
+	alertErr  := errors.New("no error")
 
 	return alertMsg, alertLvl, alertFlag, alertErr
 }
