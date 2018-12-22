@@ -19,6 +19,13 @@ var diskIndicator = prometheus.NewCounterVec(
 		Help: "Disk Stats",
 	}, []string{"disk","measure","operation"} )
 
+//	Define the metrics we wish to expose
+var diskRates = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "sreagent_disk_rates",
+		Help: "disk IO Throughput",
+	}, []string{"disk", "unit", "operation"} )
+
 
 var PluginConfig 	map[string]map[string]map[string]interface{}
 var PluginData 		map[string]interface{}
@@ -60,7 +67,13 @@ func PluginMeasure() ([]byte, []byte, float64) {
 				"wmbps":		float64(inc_wbytes)/float64(Δts) * 1e3,
 			},
 		}
+		diskRates.WithLabelValues(diskid, "iops",  "read"   ).Set(float64(inc_riop)/float64(Δts) * 1e9)
+		diskRates.WithLabelValues(diskid, "iops",  "write"  ).Set(float64(inc_wiop)/float64(Δts) * 1e9)
+		diskRates.WithLabelValues(diskid, "mbps",  "read"   ).Set(float64(inc_rbytes)/float64(Δts) * 1e3)
+		diskRates.WithLabelValues(diskid, "mbps",  "write"  ).Set(float64(inc_wbytes)/float64(Δts) * 1e3)
 	}
+	PluginData["ts_previous"] = PluginData["ts_current"]
+	PluginData["io_previous"] = PluginData["io_current"]
 	myMeasure, _ := json.Marshal(PluginData)
 	return myMeasure, []byte(""), float64(PluginData["ts_current"].(int64)) / 1e9
 }
@@ -93,6 +106,7 @@ func InitPlugin(config string) {
 	PluginData["io_previous"], _ 	= disk.IOCounters()
 	// Register metrics with prometheus
 	prometheus.MustRegister(diskIndicator)
+	prometheus.MustRegister(diskRates)
 
 	log.WithFields(log.Fields{"pluginconfig": PluginConfig, "plugindata": PluginData}).Info("InitPlugin")
 }
