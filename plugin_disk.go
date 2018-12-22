@@ -13,17 +13,11 @@ import (
 )
 
 //	Define the metrics we wish to expose
-var diskioIndicator = prometheus.NewCounterVec(
+var diskIndicator = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
-		Name: "sreagent_disk_iop",
-		Help: "Disk IO",
-	}, []string{"disk","operation"} )
-
-var diskbIndicator = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "sreagent_disk_bytes",
-		Help: "Disk Bytes",
-	}, []string{"disk","operation"} )
+		Name: "sreagent_disk",
+		Help: "Disk Stats",
+	}, []string{"disk","measure","operation"} )
 
 
 var PluginConfig 	map[string]map[string]map[string]interface{}
@@ -48,10 +42,10 @@ func PluginMeasure() ([]byte, []byte, float64) {
 		inc_wbytes 	:= PluginData["io_current"].(map[string]disk.IOCountersStat)[diskid].WriteBytes - PluginData["io_previous"].(map[string]disk.IOCountersStat)[diskid].WriteBytes
 
 		// Update metrics related to the plugin
-		diskioIndicator.WithLabelValues(diskid, "read").Add(float64(inc_riop))
-		diskioIndicator.WithLabelValues(diskid, "write").Add(float64(inc_wiop))
-		diskbIndicator.WithLabelValues(diskid,  "read").Add(float64(inc_rbytes))
-		diskbIndicator.WithLabelValues(diskid, 	"write").Add(float64(inc_wbytes))
+		diskIndicator.WithLabelValues(diskid, "io_operations", "read").Add(float64(inc_riop))
+		diskIndicator.WithLabelValues(diskid, "io_operations", "write").Add(float64(inc_wiop))
+		diskIndicator.WithLabelValues(diskid, "io_bytes",      "read").Add(float64(inc_rbytes))
+		diskIndicator.WithLabelValues(diskid, "io_bytes",      "write").Add(float64(inc_wbytes))
 
 		PluginData["io"] = map[string]map[string]float64	{
 			diskid: {
@@ -98,8 +92,7 @@ func InitPlugin(config string) {
 	PluginData["ts_previous"]	 	= time.Now().UnixNano()
 	PluginData["io_previous"], _ 	= disk.IOCounters()
 	// Register metrics with prometheus
-	prometheus.MustRegister(diskioIndicator)
-	prometheus.MustRegister(diskbIndicator)
+	prometheus.MustRegister(diskIndicator)
 
 	log.WithFields(log.Fields{"pluginconfig": PluginConfig, "plugindata": PluginData}).Info("InitPlugin")
 }
