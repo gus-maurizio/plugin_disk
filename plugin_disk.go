@@ -135,7 +135,7 @@ func main() {
 		tick := time.Now().UnixNano()
 		measure, measureraw, measuretimestamp := PluginMeasure()
 		alertmsg, alertlvl, isAlert, err := PluginAlert(measure)
-		fmt.Printf("Iteration #%d tick %d %v\n", i, tick,PluginData["io"].(map[string]map[string]float64),
+		fmt.Printf("Iteration #%d tick %d %v %v\n", i, tick,PluginData["io"].(map[string]map[string]float64),
 														 PluginData["mbps"].(map[string]map[string]float64))
 		log.WithFields(log.Fields{"timestamp": measuretimestamp,
 			"measure":    string(measure[:]),
